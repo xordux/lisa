@@ -72,6 +72,9 @@ if TYPE_CHECKING:
     from .platform_ import AzurePlatform
 
 AZURE_SHARED_RG_NAME = "lisa_shared_resource"
+AZURE_NEW_VIRTUAL_NETWORK = "lisa-virtualNetwork"
+AZURE_NEW_SUBNET_PREFIX = "lisa-subnet-"
+
 
 PATTERN_NIC_NAME = re.compile(r"Microsoft.Network/networkInterfaces/(.*)", re.M)
 PATTERN_PUBLIC_IP_NAME = re.compile(
@@ -493,9 +496,10 @@ class AzureArmParameter:
     vm_tags: Dict[str, Any] = field(default_factory=dict)
     
     virtual_network_resource_group: str = ""
-    virtual_network_name: str = "lisa-virtualNetwork"
-    subnet_prefix: str = "lisa-subnet-"
+    virtual_network_name: str = AZURE_NEW_VIRTUAL_NETWORK
+    subnet_prefix: str = AZURE_NEW_SUBNET_PREFIX
     use_existing_virtual_network: bool = False
+
 
     def __post_init__(self, *args: Any, **kwargs: Any) -> None:
         add_secret(self.admin_username, PATTERN_HEADTAIL)
@@ -1176,7 +1180,7 @@ def save_console_log(
 
 
 def load_environment(
-    platform: "AzurePlatform", resource_group_name: str, log: Logger
+    platform: "AzurePlatform", resource_group_name: str, use_private_ip: bool, log: Logger
 ) -> Environment:
     """
     reverse load environment from a resource group.
@@ -1201,6 +1205,7 @@ def load_environment(
     environment = next(x for x in environments.values())
 
     platform_runbook: schema.Platform = platform.runbook
+
     for node in environment.nodes.list():
         assert isinstance(node, RemoteNode)
 
@@ -1217,10 +1222,16 @@ def load_environment(
         ) = get_primary_ip_addresses(
             platform, resource_group_name, vms_map[node_context.vm_name]
         )
+
+        connection_public_ip = node_context.public_ip_address
+        if use_private_ip:
+            # setting public_address to empty causes set_connection_info
+            # to use address (the private ip)
+            connection_public_ip = ''
+
         node.set_connection_info(
             address=node_context.private_ip_address,
-            # public_address=node_context.public_ip_address,
-            public_address="",
+            public_address=connection_public_ip,
             username=node_context.username,
             password=node_context.password,
             private_key_file=node_context.private_key_file,
