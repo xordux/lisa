@@ -306,7 +306,7 @@ class AzurePlatformSchema:
                 "virtual_network_resource_group",
                 "virtual_network_name",
                 "subnet_prefix",
-                "use_public_ip"
+                "use_public_ip",
             ],
         )
 
