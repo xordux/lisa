@@ -100,6 +100,7 @@ from .common import (
     get_resource_management_client,
     get_storage_account_name,
     get_storage_client,
+    get_vm,
     global_credential_access_lock,
     save_console_log,
     wait_copy_blob,
@@ -1157,7 +1158,12 @@ class AzurePlatform(Platform):
             AzureNodeSchema, type_name=AZURE
         )
 
-        if not azure_node_runbook.name:
+        # if it is a new deployment
+        #  azure_node_runbook.name will be generated in below way
+        # if it is not a new deployment
+        #  if user gives the vm name, azure_node_runbook.name stores the given user name
+        #  if user doesn't give the vm name, it will be filled in initialize_environment
+        if self._azure_runbook.deploy and not azure_node_runbook.name:
             # the max length of vm name is 64 chars. Below logic takes last 45
             # chars in resource group name and keep the leading 5 chars.
             # name_prefix can contain any of customized (existing) or
@@ -1166,11 +1172,12 @@ class AzurePlatform(Platform):
             # to handle both cases
             node_name = f"{name_prefix}-n{index}"
             azure_node_runbook.name = truncate_keep_prefix(node_name, 50, node_name[:5])
-        # It's used as computer name only. Windows doesn't support name more
-        # than 15 chars
-        azure_node_runbook.short_name = truncate_keep_prefix(
-            azure_node_runbook.name, 15, azure_node_runbook.name[:5]
-        )
+        if azure_node_runbook.name:
+            # It's used as computer name only. Windows doesn't support name more
+            # than 15 chars
+            azure_node_runbook.short_name = truncate_keep_prefix(
+                azure_node_runbook.name, 15, azure_node_runbook.name[:5]
+            )
         if not azure_node_runbook.vm_size:
             raise LisaException("vm_size is not detected before deploy")
         if not azure_node_runbook.location:
@@ -1273,7 +1280,7 @@ class AzurePlatform(Platform):
             )
             arm_parameters.osdisk_size_in_gb = max(
                 arm_parameters.osdisk_size_in_gb,
-                image_info.os_disk_image.additional_properties["sizeInGb"],
+                image_info.os_disk_image.additional_properties.get("sizeInGb", 0),
             )
             if not arm_parameters.purchase_plan and image_info.plan:
                 # expand values for lru cache
@@ -1460,21 +1467,29 @@ class AzurePlatform(Platform):
         index = 0
         for node in environment.nodes.list():
             node_context = get_node_context(node)
-            vm_name = vms_name_list[index]
-            node_context.vm_name = vm_name
-            if not node.name:
-                node.name = vm_name
+            # when it is a new deployment or when vm name pass by user
+            # node_context.vm_name is not empty
+            if node_context.vm_name:
+                vm_name = node_context.vm_name
+                vm = get_vm(self, node)
+            else:
+                # when it is not a new deployment and vm name not passed by user
+                # read the vms info from the given resource group name
+                vm_name = vms_name_list[index]
+                index = index + 1
+                node_context.vm_name = vm_name
+                vm = vms_map[vm_name]
+            node.name = vm_name
             public_address, private_address = get_primary_ip_addresses(
-                self, resource_group_name, vms_map[vm_name]
+                self, resource_group_name, vm
             )
 
-            connection_public_ip = node_context.public_ip_address
+            connection_public_ip = public_address
             if self._azure_runbook.use_private_address_for_vm_connection:
                 # setting public_address to empty causes set_connection_info
                 # to use address (the private ip)
                 connection_public_ip = ''
 
-            index = index + 1
             assert isinstance(node, RemoteNode)
             node.set_connection_info(
                 address=private_address,
@@ -2037,13 +2052,21 @@ class AzurePlatform(Platform):
         container_name = matched.group("container")
         blob_name = matched.group("blob")
         storage_client = get_storage_client(self.credential, self.subscription_id)
-        sc = [x for x in storage_client.storage_accounts.list() if x.name == sc_name]
+        # sometimes it will fail for below reason if list storage accounts like this way
+        # [x for x in storage_client.storage_accounts.list() if x.name == sc_name]
+        # failure - Message: Resource provider 'Microsoft.Storage' failed to return collection response for type 'storageAccounts'.  # noqa: E501
+        sc_list = storage_client.storage_accounts.list()
+        found_sc = None
+        for sc in sc_list:
+            if sc.name == sc_name:
+                found_sc = sc
+                break
         assert (
-            sc
+            found_sc
         ), f"storage account {sc_name} not found in subscription {self.subscription_id}"
-        rg = get_matched_str(sc[0].id, RESOURCE_GROUP_PATTERN)
+        rg = get_matched_str(found_sc.id, RESOURCE_GROUP_PATTERN)
         return {
-            "location": sc[0].location,
+            "location": found_sc.location,
             "resource_group_name": rg,
             "account_name": sc_name,
             "container_name": container_name,

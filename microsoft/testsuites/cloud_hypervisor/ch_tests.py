@@ -30,21 +30,18 @@ from microsoft.testsuites.cloud_hypervisor.ch_tests_tool import CloudHypervisorT
     """,
 )
 class CloudHypervisorTestSuite(TestSuite):
-    def before_suite(self, log: Logger, **kwargs: Any) -> None:
-        node = kwargs["node"]
-        node.tools[Modprobe].load("openvswitch")
-
-    def after_suite(self, log: Logger, **kwargs: Any) -> None:
-        node = kwargs["node"]
-        node.tools[Modprobe].remove(["openvswitch"])
-
     def before_case(self, log: Logger, **kwargs: Any) -> None:
         node = kwargs["node"]
         if not isinstance(node.os, (CBLMariner, Ubuntu)):
             raise SkippedException(
                 f"Cloud Hypervisor tests are not implemented in LISA for {node.os.name}"
             )
+        node.tools[Modprobe].load("openvswitch")
         self._ensure_virtualization_enabled(node)
+
+    def after_case(self, log: Logger, **kwargs: Any) -> None:
+        node = kwargs["node"]
+        node.tools[Modprobe].remove(["openvswitch"])
 
     @TestCaseMetadata(
         description="""
@@ -150,8 +147,16 @@ class CloudHypervisorTestSuite(TestSuite):
             "ch_perf_tests_included",
             "ch_perf_tests_excluded",
         )
+        subtest_timeout = variables.get("ch_perf_subtest_timeout", None)
         node.tools[CloudHypervisorTests].run_metrics_tests(
-            result, environment, hypervisor, log_path, ref, include_list, exclude_list
+            result,
+            environment,
+            hypervisor,
+            log_path,
+            ref,
+            include_list,
+            exclude_list,
+            subtest_timeout,
         )
 
     def _ensure_virtualization_enabled(self, node: Node) -> None:
