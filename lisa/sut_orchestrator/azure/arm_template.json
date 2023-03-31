@@ -88,6 +88,12 @@
                 "description": "the prefix of the subnets"
             }
         },
+        "enable_ipforwarding": {
+            "type": "bool",
+            "metadata": {
+                "description": "enable ip forwarding in network interfaces"
+            }
+        },
         "vm_tags": {
             "type": "object",
             "metadata": {
@@ -202,6 +208,9 @@
                     },
                     "enable_sriov": {
                         "value": "[parameters('nodes')[copyIndex('nicCopy')]['enable_sriov']]"
+                    },
+                    "enable_ipforwarding": {
+                        "value": "[parameters('enable_ipforwarding')]"
                     }
                 },
                 "mode": "Incremental",
@@ -229,6 +238,9 @@
                         },
                         "enable_sriov": {
                             "type": "bool"
+                        },
+                        "enable_ipforwarding": {
+                            "type": "bool"
                         }
                     },
                     "resources": [
@@ -255,7 +267,8 @@
                                         }
                                     }
                                 ],
-                                "enableAcceleratedNetworking": "[parameters('enable_sriov')]"
+                                "enableAcceleratedNetworking": "[parameters('enable_sriov')]",
+                                "enableIPForwarding": "[parameters('enable_ipforwarding')]"
                             }
                         }
                     ],
