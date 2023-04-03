@@ -75,6 +75,8 @@ from .. import AZURE
 from . import features
 from .common import (
     AZURE_SHARED_RG_NAME,
+    AZURE_SUBNET_PREFIX,
+    AZURE_VIRTUAL_NETWORK_NAME,
     AzureArmParameter,
     AzureNodeArmParameter,
     AzureNodeSchema,
@@ -254,6 +256,10 @@ class AzurePlatformSchema:
     vm_tags: Optional[Dict[str, Any]] = field(default=None)
     locations: Optional[Union[str, List[str]]] = field(default=None)
 
+    virtual_network_resource_group: str = field(default="")
+    virtual_network_name: str = field(default=AZURE_VIRTUAL_NETWORK_NAME)
+    subnet_prefix: str = field(default=AZURE_SUBNET_PREFIX)
+
     # Provisioning error causes by waagent is not ready or other reasons. In
     # smoke test, it can verify some points also. Other tests should use the
     # default False to raise errors to prevent unexpected behavior.
@@ -292,6 +298,9 @@ class AzurePlatformSchema:
                 "resource_group_name",
                 "locations",
                 "log_level",
+                "virtual_network_resource_group",
+                "virtual_network_name",
+                "subnet_prefix",
             ],
         )
 
@@ -960,6 +969,12 @@ class AzurePlatform(Platform):
             "vm_tags",
         ]
         set_filtered_fields(self._azure_runbook, arm_parameters, copied_fields)
+
+        arm_parameters.virtual_network_resource_group = (
+            self._azure_runbook.virtual_network_resource_group
+        )
+        arm_parameters.subnet_prefix = self._azure_runbook.subnet_prefix
+        arm_parameters.virtual_network_name = self._azure_runbook.virtual_network_name
 
         is_windows: bool = False
         arm_parameters.admin_username = self.runbook.admin_username
