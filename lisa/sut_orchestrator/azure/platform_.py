@@ -255,6 +255,7 @@ class AzurePlatformSchema:
     availability_set_properties: Optional[Dict[str, Any]] = field(default=None)
     vm_tags: Optional[Dict[str, Any]] = field(default=None)
     locations: Optional[Union[str, List[str]]] = field(default=None)
+    use_public_address: bool = field(default=True)
 
     virtual_network_resource_group: str = field(default="")
     virtual_network_name: str = field(default=AZURE_VIRTUAL_NETWORK_NAME)
@@ -298,6 +299,7 @@ class AzurePlatformSchema:
                 "resource_group_name",
                 "locations",
                 "log_level",
+                "use_public_address",
                 "virtual_network_resource_group",
                 "virtual_network_name",
                 "subnet_prefix",
@@ -1437,11 +1439,13 @@ class AzurePlatform(Platform):
             public_address, private_address = get_primary_ip_addresses(
                 self, resource_group_name, vms_map[vm_name]
             )
+            node_context.use_public_address = self._azure_runbook.use_public_address
             index = index + 1
             assert isinstance(node, RemoteNode)
             node.set_connection_info(
                 address=private_address,
                 port=22,
+                use_public_address=node_context.use_public_address,
                 public_address=public_address,
                 public_port=22,
                 username=node_context.username,
