@@ -1203,10 +1203,14 @@ def get_primary_ip_addresses(
                 resource_group_name,
                 public_ip_name,
             )
-            return (
-                public_ip_address.ip_address,
-                nic.ip_configurations[0].private_ip_address,
-            )
+            if platform._azure_runbook.use_public_address:
+                return (
+                    public_ip_address.ip_address,
+                    nic.ip_configurations[0].private_ip_address,
+                )
+            else:
+                return (nic.ip_configurations[0].private_ip_address, 
+                        nic.ip_configurations[0].private_ip_address)
     raise LisaException(f"fail to find primary nic for vm {vm.name}")
 
 
