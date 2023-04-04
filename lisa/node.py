@@ -519,7 +519,6 @@ class RemoteNode(Node):
 
         assert public_port
         assert port
-        print(f"Rohit use_public_address:{use_public_address}")
         self._connection_info: schema.ConnectionInfo = schema.ConnectionInfo(
             public_address if use_public_address else address,
             public_port if use_public_address else port,
