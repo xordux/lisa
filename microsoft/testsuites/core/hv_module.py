@@ -225,6 +225,7 @@ class HvModule(TestSuite):
             sudo=True,
             shell=True,
         )
+        print("verify_reload_hyperv_modules result:", result.stdout, sep="\n")
 
         if "is in use" in result.stdout:
             raise SkippedException(
